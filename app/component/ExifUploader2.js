@@ -98,12 +98,11 @@ export default function ExifUploader() {
     setLoading(true);
 
     try {
-      // 이미지 압축 (EXIF 유지)
       const options = {
-        maxSizeMB: 2,           // 최대 2MB
-        maxWidthOrHeight: 1920, // 최대 해상도
+        maxSizeMB: 2,        
+        maxWidthOrHeight: 1920, 
         useWebWorker: true,
-        preserveExif: true,     // EXIF 유지
+        preserveExif: true,    
       };
 
       const compressedFile = await imageCompression(file, options);
@@ -160,7 +159,7 @@ export default function ExifUploader() {
           }}
         >
           <h2>📷 EXIF 정보</h2>
-          <pre>{JSON.stringify(exifData, null, 2)}</pre>
+          {/* <pre>{JSON.stringify(exifData, null, 2)}</pre> */}
           <h1>제조사 : {exifData.Make}</h1>
           <h1>카메라 모델 : {exifData.Model}</h1>
           <h1>렌즈 : {exifData.Lens ? exifData.Lens : "정보 없음"}</h1>
