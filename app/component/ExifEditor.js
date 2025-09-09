@@ -22,7 +22,7 @@
 // // //     // setLoading(true);
 
 // // //     // try {
-        
+    
 // // //     //     const compressedFile = selectedFile
 
 // // //     //     const formData = new FormData();
@@ -655,158 +655,158 @@ import { useState } from "react";
 import imageCompression from "browser-image-compression";
 
 export default function ExifEditor() {
-  const [file, setFile] = useState(null);
-  const [exifData, setExifData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [edits, setEdits] = useState({});
-  const [editingKey, setEditingKey] = useState(null);
+const [file, setFile] = useState(null);
+const [exifData, setExifData] = useState(null);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+const [edits, setEdits] = useState({});
+const [editingKey, setEditingKey] = useState(null);
 
-  // 파일 업로드 → EXIF 읽기
-  const handleFileChange = async (event) => {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
+// 파일 업로드 → EXIF 읽기
+const handleFileChange = async (event) => {
+const selectedFile = event.target.files?.[0];
+if (!selectedFile) return;
 
-    setFile(selectedFile);
-    setExifData(null);
+setFile(selectedFile);
+setExifData(null);
+setEdits({});
+setError(null);
+setEditingKey(null);
+setLoading(true);
+
+try {
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    const res = await fetch("/api/exif", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "EXIF 읽기 실패");
+
+    setExifData(data.metadata);
+} catch (err) {
+    console.error(err);
+    setError("EXIF 읽기 실패");
+} finally {
+    setLoading(false);
+}
+};
+
+// 편집 시작
+const handleEdit = (key) => {
+setEditingKey(key);
+setEdits({ ...edits, [key]: exifData[key] ?? "" });
+};
+
+// 편집 값 변경
+const handleChange = (e, key) => {
+setEdits({ ...edits, [key]: e.target.value });
+};
+
+// 저장 버튼 클릭 시 → 서버로 수정 요청 + 파일 다운로드
+const handleSave = async () => {
+if (!file) return;
+setLoading(true);
+setEditingKey(null);
+
+try {
+    const compressedFile = await imageCompression(file, {
+    maxSizeMB: 2,
+    maxWidthOrHeight: 1920,
+    useWebWorker: true,
+    preserveExif: true,
+    });
+
+    const formData = new FormData();
+    formData.append("file", compressedFile);
+    formData.append("edits", JSON.stringify(edits));
+
+    const res = await fetch("/api/exif-edit", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "EXIF 수정 실패");
+
+    setExifData(data.metadata);
     setEdits({});
-    setError(null);
-    setEditingKey(null);
-    setLoading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+    // 파일 다운로드
+    const blob = new Blob([new Uint8Array(data.fileData.data)], { type: "image/jpeg" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "edited_" + file.name;
+    link.click();
+    URL.revokeObjectURL(url);
 
-      const res = await fetch("/api/exif", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "EXIF 읽기 실패");
+} catch (err) {
+    console.error(err);
+    setError("EXIF 수정 실패");
+} finally {
+    setLoading(false);
+}
+};
 
-      setExifData(data.metadata);
-    } catch (err) {
-      console.error(err);
-      setError("EXIF 읽기 실패");
-    } finally {
-      setLoading(false);
-    }
-  };
+const renderField = (label, key) => (
+<h1 style={{ cursor: "pointer", margin: "5px 0" }} onClick={() => handleEdit(key)}>
+    {label} :{" "}
+    {editingKey === key ? (
+    <input
+        type="text"
+        value={edits[key]}
+        onChange={(e) => handleChange(e, key)}
+        autoFocus
+        style={{ fontSize: "inherit" }}
+    />
+    ) : (
+    edits[key] ?? exifData[key] ?? "정보 없음"
+    )}
+</h1>
+);
 
-  // 편집 시작
-  const handleEdit = (key) => {
-    setEditingKey(key);
-    setEdits({ ...edits, [key]: exifData[key] ?? "" });
-  };
+return (
+<div style={{ padding: "20px", fontFamily: "sans-serif" }}>
+    <h1 style={{ fontSize: "20px", fontWeight: "bold" }}>EXIF 메타데이터 편집</h1>
+    <input type="file" accept="image/*" onChange={handleFileChange} style={{ marginBottom: "15px" }} />
 
-  // 편집 값 변경
-  const handleChange = (e, key) => {
-    setEdits({ ...edits, [key]: e.target.value });
-  };
+    {loading && <p>📂 처리 중...</p>}
+    {error && <p style={{ color: "red" }}>{error}</p>}
 
-  // 저장 버튼 클릭 시 → 서버로 수정 요청 + 파일 다운로드
-  const handleSave = async () => {
-    if (!file) return;
-    setLoading(true);
-    setEditingKey(null);
+    {exifData ? (
+    <div
+        style={{
+        backgroundColor: "#f5f5f5",
+        padding: "12px",
+        borderRadius: "8px",
+        maxHeight: "500px",
+        overflow: "auto",
+        fontSize: "12px",
+        }}
+    >
+        <h2>📷 EXIF 정보 (클릭해서 수정)</h2>
+        {renderField("제조사", "Make")}
+        {renderField("카메라 모델", "Model")}
+        {renderField("렌즈", "Lens")}
+        {renderField("노출 시간", "ExposureTime")}
+        {renderField("조리개", "FNumber")}
+        {renderField("ISO", "ISO")}
+        {renderField("화각", "FocalLength")}
 
-    try {
-      const compressedFile = await imageCompression(file, {
-        maxSizeMB: 2,
-        maxWidthOrHeight: 1920,
-        useWebWorker: true,
-        preserveExif: true,
-      });
-
-      const formData = new FormData();
-      formData.append("file", compressedFile);
-      formData.append("edits", JSON.stringify(edits));
-
-      const res = await fetch("/api/exif-edit", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "EXIF 수정 실패");
-
-      setExifData(data.metadata);
-      setEdits({});
-
-      // 파일 다운로드
-      const blob = new Blob([new Uint8Array(data.fileData.data)], { type: "image/jpeg" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "edited_" + file.name;
-      link.click();
-      URL.revokeObjectURL(url);
-
-    } catch (err) {
-      console.error(err);
-      setError("EXIF 수정 실패");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderField = (label, key) => (
-    <h1 style={{ cursor: "pointer", margin: "5px 0" }} onClick={() => handleEdit(key)}>
-      {label} :{" "}
-      {editingKey === key ? (
-        <input
-          type="text"
-          value={edits[key]}
-          onChange={(e) => handleChange(e, key)}
-          autoFocus
-          style={{ fontSize: "inherit" }}
-        />
-      ) : (
-        edits[key] ?? exifData[key] ?? "정보 없음"
-      )}
-    </h1>
-  );
-
-  return (
-    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: "20px", fontWeight: "bold" }}>EXIF 메타데이터 편집</h1>
-      <input type="file" accept="image/*" onChange={handleFileChange} style={{ marginBottom: "15px" }} />
-
-      {loading && <p>📂 처리 중...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {exifData ? (
-        <div
-          style={{
-            backgroundColor: "#f5f5f5",
-            padding: "12px",
-            borderRadius: "8px",
-            maxHeight: "500px",
-            overflow: "auto",
-            fontSize: "12px",
-          }}
+        <button
+        onClick={handleSave}
+        style={{
+            marginTop: "10px",
+            padding: "8px 12px",
+            backgroundColor: "#4cafef",
+            color: "#fff",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+        }}
         >
-          <h2>📷 EXIF 정보 (클릭해서 수정)</h2>
-          {renderField("제조사", "Make")}
-          {renderField("카메라 모델", "Model")}
-          {renderField("렌즈", "Lens")}
-          {renderField("노출 시간", "ExposureTime")}
-          {renderField("조리개", "FNumber")}
-          {renderField("ISO", "ISO")}
-          {renderField("화각", "FocalLength")}
-
-          <button
-            onClick={handleSave}
-            style={{
-              marginTop: "10px",
-              padding: "8px 12px",
-              backgroundColor: "#4cafef",
-              color: "#fff",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
-          >
-            저장 & 다운로드
-          </button>
-        </div>
-      ) : (
-        !loading && <p>이미지를 업로드하면 EXIF 메타데이터를 볼 수 있습니다.</p>
-      )}
+        저장 & 다운로드
+        </button>
     </div>
-  );
+    ) : (
+    !loading && <p></p>
+    )}
+</div>
+);
 }
